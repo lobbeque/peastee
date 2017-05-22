@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <title>Peastee</title>
+    
+    <!-- Css Lib -->
+    <link href="lib/css/bootstrap.min.css" rel="stylesheet">
+    <link href="lib/css/font-awesome.min.css" rel="stylesheet">
+    <link href="lib/css/awesome-bootstrap-checkbox.css" rel="stylesheet">      
+    <link href="lib/css/qlobbe.css" rel="stylesheet">
+    <link href="lib/css/datepicker.css" rel="stylesheet">
+    <link href="https://gitcdn.github.io/bootstrap-toggle/2.2.2/css/bootstrap-toggle.min.css" rel="stylesheet">   
+    
+    <!-- Javascript Lib -->
+    <script type="text/javascript" src="lib/js/jquery-1.12.1.min.js"></script>
+    <script type="text/javascript" src="lib/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="lib/js/bootstrap-datepicker.js"></script>        
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script type="text/javascript" src="lib/js/underscore-min.js"></script>
+    <script type="text/javascript" src="lib/js/angular.min.js"></script>    
+    <script type="text/javascript" src="lib/js/async.js"></script>
+    <script src="https://gitcdn.github.io/bootstrap-toggle/2.2.2/js/bootstrap-toggle.min.js"></script> 
+
+    <script type="text/javascript" src="lib/js/util.js"></script>
+    <script type="text/javascript" src="ressources/sites.js"></script>
+    <script type="text/javascript" src="ressources/conf.js"></script>    
+
+  </head>
+  <!-- body -->
+  <body>
+    <div ng-app="mainApp">
+
+        <div class="menu-container row" ng-controller="menuCtrl">
+            <!-- menu -->            
+            <div class="col-md-1">
+                <a class="navbar-brand title" href="#">Web Archives Explorer</a>
+            </div>            
+            <div class="col-md-11">
+                <form class="navbar-form navbar-left" role="search">                   
+                    <div class="search-input">
+                        <div class="form-group">
+                            <input id="docType" checked data-toggle="toggle" data-on="Pages" data-off="Fragments" data-style="android" data-onstyle="default" type="checkbox">
+                        </div>                       
+                        <div class="form-group text">
+                            <input type="text" ng-model='form.search' class="form-control" placeholder="Search in archives">
+                        </div>
+                        <div class="form-group date">
+                            <input type="text" ng-model='form.from' class="form-control" placeholder="from *" id="from">
+                        </div> 
+                        <div class="form-group date">
+                            <input type="text" ng-model='form.to' class="form-control" placeholder="to *" id="to">
+                        </div>                         
+                        <button type="submit" class="btn btn-default" ng-click="search(form)">
+                            <b>Search</b>
+                        </button>                    
+                    </div>                    
+                </form>    
+            </div>                      
+        </div>
+
+        <div class="tab-container row"  ng-controller="tabCtrl">
+            <!-- tab -->
+            <div class="col-md-1"></div>             
+            <div class="col-md-11">
+                <nav class="tab-menu">
+                    <ul>
+                      <li><a href="#" id="tab1" ng-click="tab(1)" class="active">Archives</a></li>
+                      <li><a href="#" id="tab2" ng-click="tab(2)" class="desabled">Time Map</a></li>
+                      <li><a href="#" id="tab3" ng-click="tab(3)" class="desabled">Link</a></li>
+                      <li><a href="#" id="tab4" ng-click="tab(4)" class="desabled">Page Rank</a></li>
+                    </ul>
+                  </nav>
+            </div>           
+        </div>
+
+        <div class="viz-container container"  ng-controller="vizCtrl">
+            <!-- viz -->
+            <div ng-switch="tab">
+                <div ng-switch-when="1">
+                    <div class="row">
+                        <div class="center-block">
+                            <div ng-switch="searching">
+                                <div ng-switch-default class="alert write">
+                                    <i class="fa fa-pencil" aria-hidden="true"></i>
+                                    Please write a request just bellow to start searching the archives ... 
+                                </div>
+                                <div ng-switch-when="error"     class="alert alert-warning error"><b>Error : </b>{{error}}</div>
+                                <div ng-switch-when="searching" class="alert searching"><i class="fa fa-spinner fa-spin"></i> Searching ...</div>
+                                <div ng-switch-when="done">
+                                    <div class="count-graph row">
+                                        <div>
+                                            <ul class="list-inline graph-legend">
+                                                <li><p class="graph-title">Number of {{docType}} found by week</p></li>
+                                            </ul>
+                                        </div>
+                                        <svg id="count" height="100" class="col-md-12 ngram"></svg>
+                                    </div>
+                                    <div class="percent-graph row">
+                                        <div>
+                                            <ul class="list-inline graph-legend">
+                                                <li><p class="graph-title">Percent of {{docType}} found by week</p></li>
+                                                <li ng-repeat="query in queries">
+                                                    <p>
+                                                        <i class="fa fa-minus" aria-hidden="true" style="color:{{colorSet[$index]}}"></i>
+                                                        <i>{{query}}</i>
+                                                    </p>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                        <svg id="ngram" height="300" class="col-md-12 ngram"></svg>
+                                    </div>
+                                    <div class="result-body row">
+                                        <div class="result-facet col-md-2">
+                                            <div class="hits">
+                                                <p><span>{{hits}}</span> {{docType}}s found</p>
+                                            </div>
+                                            <div>
+                                                <p>Sort by</p>                                                
+                                                <ul class="sort">
+                                                    <li>
+                                                        <div class="radio">
+                                                            <input name="radio1" id="radio1" value="score" checked="true" type="radio" ng-click="sortBy('score')">
+                                                            <label for="radio1">
+                                                                score 
+                                                            </label>
+                                                        </div>
+                                                    </li>
+                                                    <li>
+                                                        <div class="radio">
+                                                            <input name="radio1" id="radio2" value="desc" type="radio" ng-click="sortBy('desc')">
+                                                            <label for="radio2">
+                                                                date <i class="fa fa-long-arrow-down" aria-hidden="true"></i> 
+                                                            </label>
+                                                        </div>
+                                                    </li>
+                                                    <li>
+                                                        <div class="radio">
+                                                            <input name="radio1" id="radio3" value="asc" type="radio" ng-click="sortBy('asc')">
+                                                            <label for="radio3">
+                                                                date <i class="fa fa-long-arrow-up" aria-hidden="true"></i> 
+                                                            </label>
+                                                        </div>
+                                                    </li>                                                    
+                                                </ul>                                                                                                    
+                                            </div>                                            
+                                            <div>
+                                                <ul class="list-unstyled">
+                                                    <li ng-repeat="(field, facet) in facets">
+                                                        <p class="facets-header">Focus by {{field}}</p>
+                                                        <ul class="facets">
+                                                            <li ng-repeat="(name, count) in facet">
+                                                                <p>{{name}} <span>{{count}}</span></p>
+                                                            </li>
+                                                        </ul>                                                    
+                                                    </li>
+                                                </ul>                                                
+                                            </div>
+                                        </div>
+                                        <div class="col-md-10 result-list">
+                                            <div ng-repeat="doc in docs">
+                                                <div class="doc">
+                                                    <div class="doc-header">
+                                                        <i class="fa fa-link fa-flip-vertical" style="color:#8F8F8F" aria-hidden="true"></i>
+                                                        <a href="{{doc.url}}">{{doc.site}}</a>
+                                                        <br>
+                                                        <span ng-switch="doc.date_accuracy">
+                                                            <i ng-switch-when="fragment" style="color:#099A4D" class="fa fa-clock-o" aria-hidden="true"></i>
+                                                            <i ng-switch-when="page" style="color:#099A4D" class="fa fa-clock-o" aria-hidden="true"></i>
+                                                            <i ng-switch-when="archive" style="color:#E74C3C" class="fa fa-clock-o" aria-hidden="true"></i>
+                                                             {{doc.date | date:'medium'}}
+                                                        </span>
+                                                        <br>
+                                                        <i class="fa fa-pencil" style="color:#8F8F8F" aria-hidden="true"></i>
+                                                        <span ng-repeat="author in doc.author">{{author}}{{$last ? '' : ', '}}</span> 
+                                                    </div>
+                                                    <div class="doc-body">
+                                                        <blockquote>
+                                                            <div ng-repeat="content in doc.content">
+                                                                <div ng-repeat="seq_content in content.seq_content" ng-switch="content.seq_markup[$index]">
+                                                                    <a ng-switch-when="a" ng-bind-html="seq_content | highlight:queries">{{seq_content}}</a>
+                                                                    <b ng-switch-when="b" ng-bind-html="seq_content | highlight:queries">{{seq_content}}</b>
+                                                                    <span ng-switch-when="span" ng-bind-html="seq_content | highlight:queries">{{seq_content}}</span>
+                                                                    <h1 ng-switch-when="h1" ng-bind-html="seq_content | highlight:queries">{{seq_content}}</h1> 
+                                                                    <h2 ng-switch-when="h2" ng-bind-html="seq_content | highlight:queries">{{seq_content}}</h2>
+                                                                    <p ng-switch-default ng-bind-html="seq_content | highlight:queries">{{seq_content}}</p>
+                                                                    <br ng-if="$last">
+                                                                </div>
+                                                            </div>
+                                                        </blockquote>                                                        
+                                                    </div>
+                                                    <div class="doc-version" ng-switch="docType">
+                                                        <div ng-switch-when="seq">
+                                                            <button type="submit" class="btn btn-default" ng-click="loadPage(doc.page_id)">
+                                                                <b>Load page</b> <i class="fa fa-angle-double-down" aria-hidden="true"></i>
+                                                            </button>                                                            
+                                                        </div>
+                                                    </div>                                                    
+                                                </div>
+                                                <br>
+                                            </div>
+                                            <div class="next col-md-12 text-center">
+                                                 <button type="submit" class="btn btn-default" ng-click="next()">
+                                                    <b>Load more</b> <i class="fa fa-angle-double-down" aria-hidden="true"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div ng-switch-when="2">
+                    <div class="row">
+                        <div class="center-block">row center-block 2</div>
+                    </div>
+                </div>
+                <div ng-switch-when="3"></div>
+                <div ng-switch-when="4"></div>
+            </div>                                              
+        </div>
+    </div>
+  </body>
+
+  <script type="text/javascript">
+
+    var app = angular.module('mainApp',[]);   
+
+    var colorSet = ["#FF6138","#00A388","#FFFF9D","#BEEB9F","#79BD8F"];
+
+    var colorSetBack = ["rgba(255, 97, 56, .2)","rgba(0, 163, 136, .2)","rgba(255, 255, 157, .2)","rgba(190, 235, 159, .2)","rgba(121, 189, 143, .2)"];
+
+    app.filter('highlight', function($sce) {
+      return function(text, queries) {
+
+        _.each(queries,function(q){
+            if (q) text = text.replace(new RegExp('('+q+')', 'gi'),
+                '<span style="background-color:' +  colorSet[queries.indexOf(q)] + '">$1</span>')
+        })
+        
+        return $sce.trustAsHtml(text)
+      }
+    })    
+
+    app.controller('menuCtrl', ['$scope', '$rootScope', '$http', function($scope, $rootScope, $http) {
+
+        var fromDate= $('#from').datepicker().on('changeDate', function(ev) {
+            var newDate = new Date(ev.date);
+            newDate.setDate(newDate.getDate() + 1);
+            toDate.setValue(newDate);
+            fromDate.hide();
+            $('#to')[0].focus();
+        }).data('datepicker');
+        
+        var toDate = $('#to').datepicker({
+            onRender: function(date) {
+                return date.valueOf() <= fromDate.date.valueOf() ? 'disabled' : '';
+            }
+        }).on('changeDate', function(ev) {
+            toDate.hide();
+        }).data('datepicker');  
+
+        $scope.search = function(form){
+
+            var from, to, searching, error, docType;
+
+            if ($('#docType:checked').val() != null) {
+                docType = "page";
+                $scope.docType = "pages";
+                site = "*";
+            } else {
+                docType = "seq";
+                $scope.docType = "sequences";
+                site = "*";
+            }
+
+            searching = "searching";
+
+            if (form == null || form.search == null) {
+                searching = "error";
+                error = "You must add a search request !";               
+            }
+
+            if ($('#from').val() == "" || $('#from').val() == "*") {
+                $('#from').val("*");
+                from = "*";
+            }
+                
+            if ($('#to').val() == "" || $('#from').val() == "*" ) {
+                $('#to').val("*");
+                to = "*";
+            }
+
+            if ($('#from').val().match(/\d{2}\/\d{2}\/\d{4}/g)) {
+                from = fromDate.date.toISOString();
+            } else if (from != "*") {
+                searching = "error";
+                error = "You must add a correct from date dd/mm/yyyy !";  
+            }
+
+            if ($('#to').val().match(/\d{2}\/\d{2}\/\d{4}/g)) {
+                to = toDate.date.toISOString();
+            } else if (to != "*") {
+                searching = "error";
+                error = "You must add a correct to date dd/mm/yyyy !"; 
+            } 
+
+            $rootScope.$broadcast('searching',[searching,error]); 
+
+            /*
+             * Get the archives
+             */
+
+            function searchSolr (req,dt,query) {
+                $http({
+                  method: 'GET',
+                  url: 'http://localhost:' + config.port + '/getArchives?' + req
+                }).then(function success(result) {
+                    
+                    if (result.status != 200) {
+                        $rootScope.$broadcast('searching',["error","Shit happens ... sorry bro !"]); 
+                        return;
+                    } else {
+                        $rootScope.$broadcast('searching',["done",""]);
+                    }
+
+                    $rootScope.$broadcast('result-search',[result,dt,query]);
+                });
+            }
+
+            var archiveQuery = queryBuilder({"search":form.search,"from":from,"to":to, "docType":docType, "sort":"score", "rows":"10"});
+
+            $rootScope.$on('req-search', function(context, e) {
+                searchSolr(e[0],e[1],e[2]);
+            });
+
+            searchSolr(archiveQuery,docType,{"search":form.search,"from":from,"to":to, "docType":docType, "sort":"score", "rows":"10"});
+
+            var ngramQuery = _.map(form.search.split(","), function(search){
+                return queryBuilder({"search":search,"from":from,"to":to, "docType":docType});
+            });
+
+            async.map(ngramQuery, function(query,next){
+                $http({
+                  method: 'GET',
+                  url: 'http://localhost:' + config.port + '/getNgrams?' + query
+                }).then(function success(result) {
+                    next(null,result);
+                });
+            }, function(err, res) {
+                $rootScope.$broadcast('percent-graph',[res,docType,form.search.split(",")]);
+                $rootScope.$broadcast('count-graph',[res,docType,{"search":form.search,"from":from,"to":to, "docType":docType, "sort":"score", "rows":"10"}]);
+            });            
+
+            
+                     
+        }
+    }]); 
+
+    app.controller('tabCtrl', ['$scope', '$rootScope', '$http', function($scope, $rootScope, $http) {
+
+        var tabId = _.range(1,5);
+
+        $scope.tab = function(e) {
+            $rootScope.$broadcast('tab',e);
+            $('#tab' + e).addClass("active");
+            _.each(_.without(tabId, parseInt(e)),function(id){
+                $('#tab' + id).removeClass("active");
+            });
+        }
+
+    }]);
+
+    app.controller('vizCtrl', ['$scope', '$rootScope', '$http', function($scope, $rootScope, $http) {
+
+        $scope.tab = "1";
+
+        $rootScope.$on('tab', function(context, e) {
+            $scope.tab = e;
+        });
+
+        $rootScope.$on('searching', function(context, e) {
+            $scope.searching = e[0];
+            $scope.error     = e[1];
+        });
+
+        $rootScope.$on('result-search', function(context,e) {
+
+            $scope.docType = e[1];
+
+            $scope.rows = e[2].rows; 
+
+            var result = normalizedDocs(e[0],e[1]);
+
+            var queries = _.map(result.data.debug.querystring.split('OR'), function(q){
+                return q.trim();
+            });
+
+            $scope.sortBy = function(order) {
+                e[2].sort = order;
+                $rootScope.$broadcast('req-search',[queryBuilder(e[2]),e[1],e[2]]);
+            }
+
+            $scope.next = function() {
+                e[2].rows = parseInt(e[2].rows) + 10;
+                $scope.rows = e[2].rows;  
+                $rootScope.$broadcast('req-search',[queryBuilder(e[2]),e[1],e[2]]);
+            }
+
+            $scope.loadPage = function(pageId) {
+                console.log(pageId)
+
+                 var q = queryBuilder({"search":"* id:" + pageId,"from":"*","to":"*", "docType":"page", "sort":"score", "rows":"10", "reqType":"loadPage"});
+
+                $http({
+                  method: 'GET',
+                  url: 'http://localhost:' + config.port + '/getArchives?' + q
+                }).then(function success(result) {
+                    
+                    if (result.status != 200) {
+                        $rootScope.$broadcast('searching',["error","Shit happens ... sorry bro !"]); 
+                        return;
+                    } else {
+                        $rootScope.$broadcast('searching',["done",""]);
+                    }
+
+                    console.log(result);
+                });                
+            }
+
+            $scope.queries = queries;
+            $scope.hits = result.data.response.numFound;
+            $scope.docs = result.data.response.docs; 
+            $scope.facets = result.data.facet_counts.facet_fields;
+
+        });
+
+        $rootScope.$on('count-graph', function(context,e) {
+
+            var m = {t: 15, b: 30, l: 60, r: 20};
+            var w = $("#count").width()  - m.r - m.l;
+            var h = $("#count").height() - m.t - m.b;            
+
+            var simpleDate = d3.timeFormat("%d/%m/%Y");
+
+            var arrays = _.map(e[0], function(result){
+                
+                return _.map(result.data.facets.bydate.buckets, function(d) {
+
+                    var count;
+                    if (d.count == 0 || d.match == null || d.all == null) {
+                        count = 0;
+                    } else {
+                        count = d.match.count; 
+                    }
+
+                    if (isNaN(count))
+                        count = 0;
+
+                    return {"date":new Date(d.val),"count":count};
+                                    
+                });  
+            });
+
+            var count = arrays[0];
+
+            _.each(_.rest(arrays),function(data){
+                count = _.map(data,function(d){
+                    var idx = data.indexOf(d);
+                    return {"date": d.date, "count": d.count + count[idx].count};
+                });
+            });
+            
+            var xAxis = d3.scaleTime().range([0, w]);
+            var yAxis = d3.scaleLinear().range([h, 0]);  
+            var xAxisBar = d3.scaleBand().range([0, w]).padding(0.1);   
+
+            var svg = d3.select("#count").append("svg")
+                .attr("width", w + m.r + m.l)
+                .attr("height", h + m.t + m.b)
+                .append("g")
+                .attr("transform", "translate(" + m.l + "," + m.t + ")")
+                .attr("class", "ngram");  
+
+            xAxis.domain(d3.extent(count, function(d) { return d.date; }));
+            yAxis.domain([0, d3.max(count, function(d) { return d.count; })]);
+            xAxisBar.domain(count.map(function(d) { return d.date.toString(); }));   
+
+            svg.append("g")
+                .attr("transform", "translate(0," + (h + 5) + ")")
+                .attr("class","yAxis")
+                .call(d3.axisBottom(xAxis)).select(".domain").remove();   
+                
+            svg.append("g")
+                .call(d3.axisLeft(yAxis).ticks(3))
+                .attr("class","yAxis")
+                .attr("transform", "translate(-10,0)"); 
+
+            svg.selectAll("bar")
+                .data(count)
+                .enter().append("rect")
+                .style("fill", "#2C3E50")
+                .attr("x", function(d) { return xAxisBar(d.date.toString()); })
+                .attr("width", xAxisBar.bandwidth())
+                .attr("y", function(d) { return yAxis(d.count); })
+                .attr("height", function(d) { return h - yAxis(d.count); });
+
+            /*
+             * Init Brush
+             */
+
+            var brush = d3.brushX()
+                          .extent([[0, 0], [w, h]])
+                          .on("brush", brush)
+                          .on("end", brushEnd);
+
+            svg.append("g")
+              .attr("class", "brush")
+              .call(brush)
+              .selectAll("rect")
+              .attr("y", 20)
+              .attr("height", 50);  
+
+            function brush() {
+                var selection = d3.event.selection;
+                if (!selection) selection = [0,w]
+                $rootScope.$broadcast('rescale',[selection.map(xAxis.invert, xAxis)]);
+            } 
+
+            function brushEnd() {
+                var selection = d3.event.selection;
+                if (!selection) selection = [0,w]
+                var tmp = [selection.map(xAxis.invert, xAxis)];
+                $rootScope.$broadcast('rescale',[selection.map(xAxis.invert, xAxis)]);
+                $rootScope.$broadcast('req-search',[queryBuilder({"search":e[2].search,"from":(tmp[0][0]).toISOString(),"to":(tmp[0][1]).toISOString(),"docType":e[2].docType,"sort":e[2].sort,"rows":$scope.rows}),e[2].docType,{"search":e[2].search,"from":(tmp[0][0]).toISOString(),"to":(tmp[0][1]).toISOString(),"docType":e[2].docType,"sort":e[2].sort,"rows":$scope.rows}]);
+            }                  
+                                                                      
+
+        })
+
+        $rootScope.$on('percent-graph', function(context,e) {
+
+            $scope.docType = e[1];       
+
+            $scope.queries = e[2];   
+
+            $scope.colorSet = colorSet;
+
+            var m = {t: 15, b: 30, l: 60, r: 20};
+            var w = $("#ngram").width()  - m.r - m.l;
+            var h = $("#ngram").height() - m.t - m.b;  
+
+            var simpleDate = d3.timeFormat("%d/%m/%Y");
+
+            var data = _.map(e[0], function(result){
+                
+                return _.map(result.data.facets.bydate.buckets, function(d) {
+
+                    var percent;
+                    if (d.count == 0 || d.match == null || d.all == null) {
+                        percent = 0;
+                    } else {
+                        // percent = d.match.count / d.all.count * 100;
+                        percent = d.match.count / d.all.count * 100; 
+                    }
+
+                    if (isNaN(percent))
+                        percent = 0;
+
+                    return {"date":new Date(d.val),"percent":percent};
+                                    
+                });  
+            }); 
+
+            var xAxis = d3.scaleTime().range([0, w]);
+            var yAxis = d3.scaleLinear().range([h, 0]);                         
+
+            var svg = d3.select("#ngram").append("svg")
+                .attr("width", w + m.r + m.l)
+                .attr("height", h + m.t + m.b)
+                .append("g")
+                .attr("transform", "translate(" + m.l + "," + m.t + ")")
+                .attr("class", "ngram"); 
+
+            xAxis.domain(d3.extent(_.flatten(data), function(d) { return d.date; }));
+            yAxis.domain([0, d3.max(_.flatten(data), function(d) { return d.percent; })]); 
+
+            var line = d3.line()
+                .x(function(d) { return xAxis(d.date); })
+                .y(function(d) { return yAxis(d.percent); });  
+
+            _.each(data, function(d){
+                svg.append("path")
+                    .data([d])
+                    .attr("fill", "none")
+                    .attr("stroke", colorSet[data.indexOf(d)])
+                    .attr("stroke-linejoin", "round")
+                    .attr("stroke-linecap", "round")
+                    .attr("stroke-width", 1.5)
+                    .attr("d", line)
+                    .attr("id","path" + data.indexOf(d));
+
+                    svg.append("g").attr("class", "focus").attr("id","focus" + data.indexOf(d)).append("circle").attr("r", 4.5)
+                    svg.select("#focus" + data.indexOf(d)).append("text").attr("x", 9).attr("dy", ".35em"); 
+            });
+
+            svg.append("g")
+                .attr("transform", "translate(0," + (h + 5) + ")")
+                .attr("class","xAxis")
+                .call(d3.axisBottom(xAxis)).select(".domain").remove();
+
+            svg.append("g")
+                .call(d3.axisLeft(yAxis).tickFormat(function(d) { return d + "%"; }))
+                .attr("class","yAxis")
+                .attr("transform", "translate(-10,0)");
+
+            // rescale
+
+            $rootScope.$on('rescale', function(context,e) {
+                xAxis.domain(e[0]);
+                svg.select(".xAxis").call(d3.axisBottom(xAxis)).select(".domain").remove();
+                _.each(data, function(d){          
+                    svg.select("#path" + data.indexOf(d)).data([_.filter(d, function(e){ return xAxis(e.date) > 0; })]).attr("d",line);              
+                                 
+
+                });                
+            });  
+
+            var bisect = d3.bisector(function(d) { return d.date; }).left;          
+            
+
+            // mouse over  
+
+            svg.append("rect").attr("class", "overlay").attr("width", w + m.l + m.r).attr("height", h + m.t + m.b)
+                .on("mouseover", function() {
+                    _.each(data,function(d){
+                        svg.select("#focus" + data.indexOf(d)).style("display", null); 
+                    }); 
+                })
+                .on("mouseout" , function() {
+                    _.each(data,function(d){
+                        svg.select("#focus" + data.indexOf(d)).style("display", "none"); 
+                    });                  
+                })
+                .on("mousemove", mousemove);   
+
+            function mousemove() {
+                var x = xAxis.invert(d3.mouse(this)[0]  - m.t);
+                _.each(data,function(d){
+                    var i = bisect(d, x, 1);
+                    var d0 = d[i - 1];
+                    var d1 = d[i];
+                    var dFocus = d0;
+                    if(d1 != undefined)
+                        dFocus = x - d0.date > d1.date - x ? d1 : d0;
+
+                    svg.select("#focus" + data.indexOf(d)).attr("transform", "translate(" + (xAxis(dFocus.date)) + "," + yAxis(dFocus.percent) + ")");
+                    svg.select("#focus" + data.indexOf(d)).select("text").text(simpleDate(dFocus.date));
+                })
+            }                      
+        });
+
+    }])
+
+  </script>
+
+</html>
