@@ -79,13 +79,22 @@ body {
 }
 
 .focus circle {
-  fill: none;
-  stroke: #B23C2C;
+  fill: white;
+  stroke: steelblue;
+  stroke-width: 2px;
+}
+
+.focusLine {
+    fill : none;
+    stroke: steelblue;
+    stroke-width: 1px;
+    stroke-dasharray: 5;
 }
 
 .event circle {
-  fill: none;
-  stroke: blue;
+    fill: white;
+    stroke: steelblue;
+    stroke-width: 1px;
 }
 
 .graph-legend {

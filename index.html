@@ -94,7 +94,7 @@
                                     <div class="count-graph row">
                                         <div>
                                             <ul class="list-inline graph-legend">
-                                                <li><p class="graph-title">Number of {{docType}} found by week</p></li>
+                                                <li><p class="graph-title">Number of {{docTypeFront}} found by week</p></li>
                                             </ul>
                                         </div>
                                         <svg id="count" height="100" class="col-md-12 ngram"></svg>
@@ -102,7 +102,7 @@
                                     <div class="percent-graph row">
                                         <div>
                                             <ul class="list-inline graph-legend">
-                                                <li><p class="graph-title">Percent of {{docType}} found by week</p></li>
+                                                <li><p class="graph-title">Percent of {{docTypeFront}} found by week</p></li>
                                                 <li ng-repeat="query in queries">
                                                     <p>
                                                         <i class="fa fa-minus" aria-hidden="true" style="color:{{colorSet[$index]}}"></i>
@@ -116,7 +116,7 @@
                                     <div class="result-body row">
                                         <div class="result-facet col-md-2">
                                             <div class="hits">
-                                                <p><span>{{hits}}</span> {{docType}}s found</p>
+                                                <p><span>{{hits}}</span> {{docTypeFront}}s found</p>
                                             </div>
                                             <div>
                                                 <p>Sort by</p>                                                
@@ -278,6 +278,8 @@
                 site = "*";
             }
 
+
+
             searching = "searching";
 
             if (form == null || form.search == null) {
@@ -391,6 +393,12 @@
         $rootScope.$on('result-search', function(context,e) {
 
             $scope.docType = e[1];
+
+            if (e[1] == "page") {
+                $scope.docTypeFront = "page"
+            } else {
+                $scope.docTypeFront = "fragment"
+            }
 
             $scope.rows = e[2].rows; 
 
@@ -554,6 +562,8 @@
             var w = $("#ngram").width()  - m.r - m.l;
             var h = $("#ngram").height() - m.t - m.b;  
 
+            // parse data
+
             var simpleDate = d3.timeFormat("%d/%m/%Y");
 
             var data = _.map(e[0], function(result){
@@ -574,94 +584,201 @@
                     return {"date":new Date(d.val),"percent":percent};
                                     
                 });  
-            }); 
-
-            var xAxis = d3.scaleTime().range([0, w]);
-            var yAxis = d3.scaleLinear().range([h, 0]);                         
-
-            var svg = d3.select("#ngram").append("svg")
-                .attr("width", w + m.r + m.l)
-                .attr("height", h + m.t + m.b)
-                .append("g")
-                .attr("transform", "translate(" + m.l + "," + m.t + ")")
-                .attr("class", "ngram"); 
-
-            xAxis.domain(d3.extent(_.flatten(data), function(d) { return d.date; }));
-            yAxis.domain([0, d3.max(_.flatten(data), function(d) { return d.percent; })]); 
-
-            var line = d3.line()
-                .x(function(d) { return xAxis(d.date); })
-                .y(function(d) { return yAxis(d.percent); });  
-
-            _.each(data, function(d){
-                svg.append("path")
-                    .data([d])
-                    .attr("fill", "none")
-                    .attr("stroke", colorSet[data.indexOf(d)])
-                    .attr("stroke-linejoin", "round")
-                    .attr("stroke-linecap", "round")
-                    .attr("stroke-width", 1.5)
-                    .attr("d", line)
-                    .attr("id","path" + data.indexOf(d));
-
-                    svg.append("g").attr("class", "focus").attr("id","focus" + data.indexOf(d)).append("circle").attr("r", 4.5)
-                    svg.select("#focus" + data.indexOf(d)).append("text").attr("x", 9).attr("dy", ".35em"); 
             });
 
-            svg.append("g")
-                .attr("transform", "translate(0," + (h + 5) + ")")
-                .attr("class","xAxis")
-                .call(d3.axisBottom(xAxis)).select(".domain").remove();
+            // treshold & events
 
-            svg.append("g")
-                .call(d3.axisLeft(yAxis).tickFormat(function(d) { return d + "%"; }))
-                .attr("class","yAxis")
-                .attr("transform", "translate(-10,0)");
+            function getEvents(e,d,q,next) {
+                
+                var i = d.indexOf(e);
+                var dInf = d[i - 1] != null ? d[i - 1].date : e.date;
+                var dSup = d[i + 1] != null ? d[i + 1].date : e.date;
 
-            // rescale
+                $http({
+                  method: 'GET',
+                  url: 'http://localhost:' + config.port + '/getEvents?q=' + encodeURIComponent(q) + '&from=' + dInf.toISOString() + '&to=' + dSup.toISOString() 
+                }).then(function success(result) {       
+                    if (result.status == 200 && !_.isEmpty(result.data.response.docs)) {
+                        e["title"] = result.data.response.docs[0].title;
+                    }
+                    next(null,e);
+                });
 
-            $rootScope.$on('rescale', function(context,e) {
-                xAxis.domain(e[0]);
-                svg.select(".xAxis").call(d3.axisBottom(xAxis)).select(".domain").remove();
-                _.each(data, function(d){          
-                    svg.select("#path" + data.indexOf(d)).data([_.filter(d, function(e){ return xAxis(e.date) > 0; })]).attr("d",line);              
-                                 
+            }
 
-                });                
-            });  
+            async.map(data, function(d,nextD){
 
-            var bisect = d3.bisector(function(d) { return d.date; }).left;          
-            
+                var q = $scope.queries[data.indexOf(d)].replace(/[^ ]*:[^ ]*/g,"").trim();
 
-            // mouse over  
+                async.map(d,function(e,nextE){
 
-            svg.append("rect").attr("class", "overlay").attr("width", w + m.l + m.r).attr("height", h + m.t + m.b)
-                .on("mouseover", function() {
+                    var i = d.indexOf(e);
+                    var pInf = d[i - 1] != null ? d[i - 1].percent : 0; 
+                    var pSup = d[i + 1] != null ? d[i + 1].percent : 0;
+                    var pDif = (e.percent - (pInf + pSup)) / (pInf + pSup) * 100;
+                    e["treshold"] = isNaN(pDif) ? 0 : pDif;
+
+                    if (e.treshold > 100) {
+                        getEvents(e,d,q,nextE);
+                    } else {
+                        nextE(null,e);   
+                    }
+
+                    
+                }, function(err,d){
+                    nextD(null,d);
+                });
+
+            },function(err,data){
+
+                // draw                 
+
+                var xAxis = d3.scaleTime().range([0, w]);
+                var yAxis = d3.scaleLinear().range([h, 0]);                         
+
+                var svg = d3.select("#ngram").append("svg")
+                    .attr("width", w + m.r + m.l)
+                    .attr("height", h + m.t + m.b)
+                    .append("g")
+                    .attr("transform", "translate(" + m.l + "," + m.t + ")")
+                    .attr("class", "ngram"); 
+
+                xAxis.domain(d3.extent(_.flatten(data), function(d) { return d.date; }));
+                yAxis.domain([0, d3.max(_.flatten(data), function(d) { return d.percent; })]); 
+
+                var line = d3.line()
+                    .x(function(d) { return xAxis(d.date); })
+                    .y(function(d) { return yAxis(d.percent); });               
+
+                _.each(data, function(d){
+                    svg.append("path")
+                        .data([d])
+                        .attr("fill", "none")
+                        .attr("stroke", colorSet[data.indexOf(d)])
+                        .attr("stroke-linejoin", "round")
+                        .attr("stroke-linecap", "round")
+                        .attr("stroke-width", 1.5)
+                        .attr("d", line)
+                        .attr("id","path" + data.indexOf(d));
+
+                    svg.append("g").attr("class", "focus").attr("id","focus" + data.indexOf(d)).append("circle").attr("r", 6)
+
+                    svg.append("g")
+                        .attr("id","focusText")
+                        .append("text");
+
+                    svg.select("#focus" + data.indexOf(d))
+                        .append('line')
+                        .attr('id', 'focusLineX')
+                        .attr('class',"focusLine");
+
+                    svg.append("g")
+                        .attr('id', 'focusLineY')
+                        .attr('class',"focusLine")
+                        .append('line');                        
+
+                    var dot = svg.selectAll("dot").data(d).enter()
+                        .filter(function(e) { return e.treshold > 100 })
+                        .filter(function(e) { return e.title != null });
+
+                    dot.append("circle")
+                        .attr('cx', function(e) { return xAxis(e.date) })
+                        .attr('cy', function(e) { return yAxis(e.percent) })
+                        .attr('r', 6)
+                        .attr("stroke",colorSet[data.indexOf(d)])
+                        .attr("fill","white")
+                        .attr("stroke-width","2px")
+                        .attr("class","eventC");
+
+                    dot.append("text")
+                        .attr("x", function(e) { return xAxis(e.date) + 10 })
+                        .attr("y", function(e) { return yAxis(e.percent) + 5 })
+                        .text(function(e) { return e.title })
+                        .attr("class","eventT");                   
+
+                });
+
+                svg.append("g")
+                    .attr("transform", "translate(0," + (h + 5) + ")")
+                    .attr("class","xAxis")
+                    .call(d3.axisBottom(xAxis)).select(".domain").remove();
+
+                svg.append("g")
+                    .call(d3.axisLeft(yAxis).tickFormat(function(d) { return d + "%"; }))
+                    .attr("class","yAxis")
+                    .attr("transform", "translate(-10,0)");
+
+                // rescale
+
+                $rootScope.$on('rescale', function(context,e) {
+                    xAxis.domain(e[0]);
+                    svg.select(".xAxis").call(d3.axisBottom(xAxis)).select(".domain").remove();
+                    _.each(data, function(d){          
+                        svg.select("#path" + data.indexOf(d)).data([_.filter(d, function(e){ return xAxis(e.date) > 0; })]).attr("d",line);  
+                    });                
+                    svg.selectAll(".eventT").attr("x", function(e) { return xAxis(e.date) + 10 });
+                    svg.selectAll(".eventC").attr("cx", function(e) { return xAxis(e.date) });                    
+                });  
+
+                var bisect = d3.bisector(function(d) { return d.date; }).left;                       
+
+                // mouse over  
+
+                svg.append("rect").attr("class", "overlay").attr("width", w + m.l + m.r).attr("height", h + m.t + m.b)
+                    .on("mouseover", function() {
+                        _.each(data,function(d){
+                            svg.select("#focus" + data.indexOf(d)).style("display", null); 
+                            svg.select("#focusLineY").style("display", null); 
+                            svg.select("#focusText").style("display", null);                             
+                        }); 
+                    })
+                    .on("mouseout" , function() {
+                        _.each(data,function(d){
+                            svg.select("#focus" + data.indexOf(d)).style("display", "none");
+                            svg.select("#focusLineY").style("display", "none"); 
+                            svg.select("#focusText").style("display", "none"); 
+                        });                  
+                    })
+                    .on("mousemove", mousemove);   
+
+                function mousemove() {
+                    var x = xAxis.invert(d3.mouse(this)[0]  - m.t);
+                    var y = yAxis.invert(d3.mouse(this)[1]);
+                    var dFocus;
                     _.each(data,function(d){
-                        svg.select("#focus" + data.indexOf(d)).style("display", null); 
-                    }); 
-                })
-                .on("mouseout" , function() {
-                    _.each(data,function(d){
-                        svg.select("#focus" + data.indexOf(d)).style("display", "none"); 
-                    });                  
-                })
-                .on("mousemove", mousemove);   
+                        var i = bisect(d, x, 1);
+                        var d0 = d[i - 1];
+                        var d1 = d[i];
+                        dFocus = d0;
+                        if(d1 != undefined)
+                            dFocus = x - d0.date > d1.date - x ? d1 : d0;
 
-            function mousemove() {
-                var x = xAxis.invert(d3.mouse(this)[0]  - m.t);
-                _.each(data,function(d){
-                    var i = bisect(d, x, 1);
-                    var d0 = d[i - 1];
-                    var d1 = d[i];
-                    var dFocus = d0;
-                    if(d1 != undefined)
-                        dFocus = x - d0.date > d1.date - x ? d1 : d0;
+                        svg.select("#focus" + data.indexOf(d)).attr("transform", "translate(" + (xAxis(dFocus.date)) + "," + yAxis(dFocus.percent) + ")");
+                        
+                        svg.select("#focus" + data.indexOf(d)).select("#focusLineX")
+                            .attr('x1', w - xAxis(dFocus.date))
+                            .attr('y1', 0)
+                            .attr('x2', -xAxis(dFocus.date))
+                            .attr('y2', 0);                          
 
-                    svg.select("#focus" + data.indexOf(d)).attr("transform", "translate(" + (xAxis(dFocus.date)) + "," + yAxis(dFocus.percent) + ")");
-                    svg.select("#focus" + data.indexOf(d)).select("text").text(simpleDate(dFocus.date));
-                })
-            }                      
+                    })
+
+                    svg.select("#focusLineY")
+                        .select("line")
+                        .attr('x1', d3.mouse(this)[0] - m.t)
+                        .attr('y1', h)
+                        .attr('x2', d3.mouse(this)[0] - m.t)
+                        .attr('y2', 0);                     
+                    
+                    svg.select("#focusText").select("text")
+                        .text(simpleDate(dFocus.date))
+                        .attr('x',d3.mouse(this)[0])
+                        .attr('y',d3.mouse(this)[1] - 10);
+
+                } 
+                       
+            });
+                     
         });
 
     }])

@@ -143,6 +143,40 @@ app.get('/getArchives', function(req, res){
 
 });
 
+app.get('/getEvents', function(req, res){
+
+  console.log("\n==============================\n");
+
+  var path = "/solr/events_maroco/select?q=" + encodeURIComponent(req.query.q) +"&fq=date:[" + req.query.from +"%20TO%20" + req.query.to + "]&rows=1";
+
+  console.log("> Get Events\n" + "http://lame11.enst.fr:8800" + path)
+
+  var options = {
+        hostname: config.solr.hostname,
+        port: config.solr.port,
+        method: 'GET',
+        path: path
+    };  
+
+    var resp = "";        
+
+    var httpReq = http.request(options, function(httpRes) {
+
+        httpRes.setEncoding('utf8');
+
+        httpRes.on('data', function(results) {
+            resp = resp + results;
+        });
+
+        httpRes.on('end', function(err) {
+          res.send(resp)
+        });
+    });
+
+    httpReq.end();    
+
+});
+
 function getDateBorder (path, dateField, order, next) {
 
   path += "&rows=1&sort=" + dateField + "%20" + order;
